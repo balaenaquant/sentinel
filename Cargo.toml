@@ -2,6 +2,11 @@
 name = "sentinel"
 version = "0.1.0"
 edition = "2024"
+description = "Async file and storage watching with typed deserialization, supporting local filesystem and NATS JetStream KV backends"
+license = "MIT"
+readme = "README.md"
+keywords = ["file-watcher", "hot-reload", "nats", "config", "async"]
+categories = ["filesystem", "asynchronous", "config"]
 
 [features]
 default = ["fs"]
