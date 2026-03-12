@@ -38,12 +38,25 @@ impl DeserializationError {
             location,
         }
     }
+
+    fn from_toml_error(input: impl Into<String>, cause: toml::de::Error) -> Self {
+        let input = input.into();
+        let location = SourceOffset::from_location(&input, 0, 0);
+        Self {
+            cause: cause.to_string(),
+            input,
+            location,
+        }
+    }
 }
 
 #[allow(unused)]
 pub fn serialize_bytes<T: Serialize>(value: &T, format: Format) -> miette::Result<Vec<u8>> {
     match format {
         Format::Yaml => serde_yaml_ng::to_string(value)
+            .map(|v| v.as_bytes().to_vec())
+            .into_diagnostic(),
+        Format::Toml => toml::to_string(value)
             .map(|v| v.as_bytes().to_vec())
             .into_diagnostic(),
         Format::Json => serde_json::to_vec(value).into_diagnostic(),
@@ -60,6 +73,9 @@ pub fn deserialize_bytes<T: DeserializeOwned>(
                 std::str::from_utf8(contents).unwrap(),
                 cause,
             )
+        }),
+        Format::Toml => toml::from_slice(contents).map_err(|cause| {
+            DeserializationError::from_toml_error(std::str::from_utf8(contents).unwrap(), cause)
         }),
         Format::Json => serde_json::from_slice(contents).map_err(|cause| {
             DeserializationError::from_serde_json_error(

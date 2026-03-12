@@ -11,6 +11,7 @@ pub mod serde;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Yaml,
+    Toml,
     Json,
 }
 

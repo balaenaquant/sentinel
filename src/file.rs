@@ -70,6 +70,8 @@ impl<T: ::serde::de::DeserializeOwned> StorageTyped<T> for FileWatcher {
 
         if ext.eq_ignore_ascii_case("yaml") || ext.eq_ignore_ascii_case("yml") {
             deserialize_bytes(&contents, Format::Yaml).map_err(|e| eyre::eyre!(e))
+        } else if ext.eq_ignore_ascii_case("toml") {
+            deserialize_bytes(&contents, Format::Toml).map_err(|e| eyre::eyre!(e))
         } else if ext.eq_ignore_ascii_case("json") {
             deserialize_bytes(&contents, Format::Json).map_err(|e| eyre::eyre!(e))
         } else {
