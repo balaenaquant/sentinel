@@ -1,3 +1,5 @@
+use color_eyre::eyre;
+
 #[cfg(feature = "fs")]
 pub mod file;
 #[cfg(feature = "nats")]
@@ -19,14 +21,14 @@ pub trait Storage {
 #[cfg(feature = "serde")]
 #[async_trait::async_trait]
 pub trait StorageTyped<T: ::serde::de::DeserializeOwned> {
-    async fn load(&self) -> miette::Result<T>;
+    async fn load(&self) -> eyre::Result<T>;
 
     async fn watch(&self) -> Option<T>;
 }
 
 #[async_trait::async_trait]
 pub trait StorageBytes {
-    async fn load_bytes(&self) -> miette::Result<Vec<u8>>;
+    async fn load_bytes(&self) -> eyre::Result<Vec<u8>>;
 
     async fn watch_bytes(&self) -> Option<Vec<u8>>;
 }

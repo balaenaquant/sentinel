@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use miette::IntoDiagnostic;
+use color_eyre::eyre;
 use notify::{
     EventKind, Watcher,
     event::{DataChange, ModifyKind},
@@ -20,7 +20,7 @@ pub struct FileWatcher {
     watcher: notify::RecommendedWatcher,
 }
 impl FileWatcher {
-    pub fn new(path: PathBuf) -> miette::Result<Self> {
+    pub fn new(path: PathBuf) -> eyre::Result<Self> {
         let (mut tx, rx) = postage::dispatch::channel(1024);
 
         let mut watcher = notify::RecommendedWatcher::new(
@@ -39,17 +39,14 @@ impl FileWatcher {
                 Err(e) => tracing::error!("File watch error: {e}"),
             },
             notify::Config::default(),
-        )
-        .into_diagnostic()?;
-        watcher
-            .watch(&path, notify::RecursiveMode::NonRecursive)
-            .into_diagnostic()?;
+        )?;
+        watcher.watch(&path, notify::RecursiveMode::NonRecursive)?;
 
         Ok(Self { path, watcher, rx })
     }
 
-    pub fn blocking_load_bytes(&self) -> miette::Result<Vec<u8>> {
-        std::fs::read(&self.path).into_diagnostic()
+    pub fn blocking_load_bytes(&self) -> eyre::Result<Vec<u8>> {
+        Ok(std::fs::read(&self.path)?)
     }
 }
 
@@ -62,21 +59,21 @@ impl Storage for FileWatcher {
 #[cfg(feature = "serde")]
 #[async_trait::async_trait]
 impl<T: ::serde::de::DeserializeOwned> StorageTyped<T> for FileWatcher {
-    async fn load(&self) -> miette::Result<T> {
-        let contents = tokio::fs::read(&self.path).await.into_diagnostic()?;
+    async fn load(&self) -> eyre::Result<T> {
+        let contents = tokio::fs::read(&self.path).await?;
 
         let ext = self
             .path
             .extension()
             .and_then(|s| s.to_str())
-            .ok_or(miette::miette!("File has no extension: {:?}", self.path))?;
+            .ok_or(eyre::eyre!("File has no extension: {:?}", self.path))?;
 
         if ext.eq_ignore_ascii_case("yaml") || ext.eq_ignore_ascii_case("yml") {
-            deserialize_bytes(&contents, Format::Yaml)
+            deserialize_bytes(&contents, Format::Yaml).map_err(|e| eyre::eyre!(e))
         } else if ext.eq_ignore_ascii_case("json") {
-            deserialize_bytes(&contents, Format::Json)
+            deserialize_bytes(&contents, Format::Json).map_err(|e| eyre::eyre!(e))
         } else {
-            miette::bail!("Unsupported file extension: {}", ext);
+            eyre::bail!("Unsupported file extension: {}", ext);
         }
     }
 
@@ -102,8 +99,8 @@ impl<T: ::serde::de::DeserializeOwned> StorageTyped<T> for FileWatcher {
 
 #[async_trait::async_trait]
 impl StorageBytes for FileWatcher {
-    async fn load_bytes(&self) -> miette::Result<Vec<u8>> {
-        tokio::fs::read(&self.path).await.into_diagnostic()
+    async fn load_bytes(&self) -> eyre::Result<Vec<u8>> {
+        Ok(tokio::fs::read(&self.path).await?)
     }
 
     async fn watch_bytes(&self) -> Option<Vec<u8>> {

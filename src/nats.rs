@@ -1,5 +1,5 @@
+use color_eyre::eyre;
 use futures::StreamExt;
-use miette::IntoDiagnostic;
 use postage::{sink::Sink, stream::Stream};
 
 use super::{Format, Storage, StorageBytes};
@@ -21,11 +21,11 @@ impl NatsStorage {
         bucket: impl Into<String>,
         key: impl AsRef<str>,
         format: Format,
-    ) -> miette::Result<Self> {
+    ) -> eyre::Result<Self> {
         let js = async_nats::jetstream::new(client);
-        let store = js.get_key_value(bucket).await.into_diagnostic()?;
+        let store = js.get_key_value(bucket).await?;
 
-        let mut watch = store.watch(&key).await.into_diagnostic()?;
+        let mut watch = store.watch(&key).await?;
         let (mut tx, rx) = postage::dispatch::channel(1024);
         tokio::spawn(async move {
             while let Some(entry) = watch.next().await {
@@ -39,7 +39,6 @@ impl NatsStorage {
                 _ = tx
                     .send(entry)
                     .await
-                    .into_diagnostic()
                     .inspect_err(|e| tracing::error!("KV watcher send error: {e}"));
             }
         });
@@ -62,8 +61,8 @@ impl Storage for NatsStorage {
 #[cfg(feature = "serde")]
 #[async_trait::async_trait]
 impl<T: serde::de::DeserializeOwned> StorageTyped<T> for NatsStorage {
-    async fn load(&self) -> miette::Result<T> {
-        deserialize_bytes(&self.load_bytes().await?, self.format)
+    async fn load(&self) -> eyre::Result<T> {
+        deserialize_bytes(&self.load_bytes().await?, self.format).map_err(|e| eyre::eyre!(e))
     }
 
     async fn watch(&self) -> Option<T> {
@@ -86,12 +85,11 @@ impl<T: serde::de::DeserializeOwned> StorageTyped<T> for NatsStorage {
 
 #[async_trait::async_trait]
 impl StorageBytes for NatsStorage {
-    async fn load_bytes(&self) -> miette::Result<Vec<u8>> {
+    async fn load_bytes(&self) -> eyre::Result<Vec<u8>> {
         self.store
             .get(&self.key)
-            .await
-            .into_diagnostic()?
-            .ok_or(miette::miette!(
+            .await?
+            .ok_or(eyre::eyre!(
                 "Key {} not found in bucket {}",
                 self.key,
                 self.store.name
